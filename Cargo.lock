@@ -537,6 +537,7 @@ dependencies = [
  "serde",
  "serde_derive",
  "serde_json",
+ "tempfile",
  "tokio",
  "tonic_lnd",
  "url",
