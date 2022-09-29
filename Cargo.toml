@@ -32,3 +32,9 @@ configure_me_codegen = "0.4.1"
 [dev-dependencies]
 bitcoincore-rpc = "0.15.0"
 tempfile = "3"
+tonic = "0.6.2"
+
+# [test]
+# name = "test"
+# path = "tests/integration.rs"
+# required-features = ["test_paths"]
