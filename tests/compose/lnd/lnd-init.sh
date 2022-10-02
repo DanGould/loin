@@ -41,15 +41,14 @@ lnd --configfile=/data/lnd.conf \
 echo "[DEBUG] lnd Started"
 
 # Wait for lnd to server to start 
-lnd_status="$(lncli --network testnet state | jq -r .state)"
+lnd_status="$(lncli --network regtest state | jq -r .state)"
 # Wait till lnd starts
 while [ $lnd_status != "SERVER_ACTIVE" ]
 do
-  lnd_status="$(lncli --network testnet state | jq .state)"
+  lnd_status="$(lncli --network regtest state | jq .state)"
   echo "[DEBUG] Waiting for lnd to start. Server status $lnd_status"
   sleep 5
 done
-
 while [ 1 -ne 0 ]
 do
   # Do busy work / alerting / monitoring here
