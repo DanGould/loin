@@ -2,7 +2,7 @@ use std::ffi::OsString;
 use std::fmt;
 use std::num::ParseIntError;
 
-use crate::{ScheduledChannel, ScheduledPayJoin};
+use crate::scheduler::{ScheduledChannel, ScheduledPayJoin};
 
 /// CLI argument errors.
 #[derive(Debug)]
@@ -62,9 +62,10 @@ where
                 channels.push(ScheduledChannel::from_args(addr, amount)?);
             }
             // if there is a remaining single argument, it is the wallet amount
-            (Some(amount), None) =>
+            (Some(amount), None) => {
                 break bitcoin::Amount::from_str_in(amount, bitcoin::Denomination::Satoshi)
-                    .map_err(ArgError::InvalidWalletAmount)?,
+                    .map_err(ArgError::InvalidWalletAmount)?
+            }
             // if there is no remaining single argument, the wallet amount is 0
             _ => break bitcoin::Amount::ZERO,
         }
