@@ -274,7 +274,7 @@ impl Scheduler {
         original_req: UncheckedProposal,
     ) -> Result<String, SchedulerError> {
         if original_req.is_output_substitution_disabled() {
-            Err(SchedulerError::OutputSubstitutionDisabled);
+            return Err(SchedulerError::OutputSubstitutionDisabled);
         }
         let request = original_req
             // This is interactive, NOT a Payment Processor, so we don't save original tx.
