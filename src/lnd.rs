@@ -6,7 +6,12 @@ use bitcoin::psbt::PartiallySignedTransaction;
 use bitcoin::Address;
 use ln_types::P2PAddress;
 use tokio::sync::Mutex as AsyncMutex;
-use tonic_lnd::rpc::{FundingTransitionMsg, OpenChannelRequest, OpenStatusUpdate};
+use tonic_lnd::rpc::{
+    funding_transition_msg::Trigger, FundingPsbtVerify, FundingTransitionMsg, OpenChannelRequest,
+    OpenStatusUpdate,
+};
+
+use crate::scheduler::ChannelId;
 
 #[derive(Debug)]
 pub enum LndError {
@@ -51,17 +56,33 @@ impl std::error::Error for LndError {
 }
 
 impl From<tonic_lnd::Error> for LndError {
-    fn from(value: tonic_lnd::Error) -> Self { LndError::Generic(value) }
+    fn from(value: tonic_lnd::Error) -> Self {
+        LndError::Generic(value)
+    }
 }
 
 impl From<tonic_lnd::ConnectError> for LndError {
-    fn from(value: tonic_lnd::ConnectError) -> Self { LndError::ConnectError(value) }
+    fn from(value: tonic_lnd::ConnectError) -> Self {
+        LndError::ConnectError(value)
+    }
 }
 
 #[derive(Clone)]
 pub struct LndClient(Arc<AsyncMutex<tonic_lnd::Client>>);
 
 impl LndClient {
+    /// New [LndClient] from [Config].
+    pub async fn from_config(config: &crate::config::Config) -> Result<Self, LndError> {
+        let raw_client = tonic_lnd::connect(
+            config.lnd_address.clone(),
+            &config.lnd_cert_path,
+            &config.lnd_macaroon_path,
+        )
+        .await?;
+
+        Self::new(raw_client).await
+    }
+
     pub async fn new(mut client: tonic_lnd::Client) -> Result<Self, LndError> {
         let response = client
             .get_info(tonic_lnd::rpc::GetInfoRequest {})
@@ -159,6 +180,34 @@ impl LndClient {
             }
         }
         Ok(None)
+    }
+
+    /// Sends the `FundingPsbtVerify` message to remote lnd nodes to finalize channels of given
+    /// channel ids.
+    pub async fn verify_funding<I>(&self, funded_psbt: &[u8], chan_ids: I) -> Result<(), LndError>
+    where
+        I: IntoIterator<Item = ChannelId>,
+    {
+        let handles = chan_ids
+            .into_iter()
+            .map(|chan_id| {
+                let client = self.clone();
+                let req = FundingTransitionMsg {
+                    trigger: Some(Trigger::PsbtVerify(FundingPsbtVerify {
+                        pending_chan_id: chan_id.into(),
+                        funded_psbt: funded_psbt.to_vec(),
+                        skip_finalize: true,
+                    })),
+                };
+                tokio::spawn(async move { client.funding_state_step(req).await })
+            })
+            .collect::<Vec<_>>();
+
+        for handle in handles {
+            handle.await.unwrap()?;
+        }
+
+        Ok(())
     }
 
     pub async fn funding_state_step(&self, req: FundingTransitionMsg) -> Result<(), LndError> {
