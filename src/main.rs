@@ -107,10 +107,6 @@ async fn handle_web_req(
             dbg!(&bytes); // this is correct by my accounts
             let reader = &*bytes;
             let original_request = UncheckedProposal::from_request(reader, query, headers).unwrap();
-            if original_request.is_output_substitution_disabled() {
-                // TODO handle error for output substitution properly, don't panic
-                panic!("Output substitution must be enabled");
-            }
 
             let proposal_psbt = scheduler.propose_payjoin(original_request).await.unwrap();
 

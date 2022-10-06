@@ -274,8 +274,7 @@ impl Scheduler {
         original_req: UncheckedProposal,
     ) -> Result<String, SchedulerError> {
         if original_req.is_output_substitution_disabled() {
-            // TODO handle error for output substitution properly, don't panic
-            panic!("Output substitution must be enabled");
+            Err(SchedulerError::OutputSubstitutionDisabled);
         }
         let request = original_req
             // This is interactive, NOT a Payment Processor, so we don't save original tx.
@@ -370,9 +369,11 @@ pub enum SchedulerError {
     Lnd(LndError),
     /// Internal error that should not be shared
     Internal(&'static str),
+    /// Output Substitution is required to change the original output to a channel open
+    OutputSubstitutionDisabled,
     /// No Original Psbt outputs match any [ScheduledPayJoin]
     NoMatchingPayJoin,
-    /// Failed to open any channel for [ScheduledPayJoin].
+    /// Failed to open any channel for [ScheduledPayJoin]
     PayJoinCannotOpenAnyChannel,
     /// Original Psbt does not respect requested amount
     OriginalPsbtInvalidAmount,
