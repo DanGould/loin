@@ -1,3 +1,4 @@
+
 use std::{
     collections::HashMap,
     convert::TryInto,
@@ -249,6 +250,10 @@ impl Scheduler {
     /// New [Scheduler].
     pub fn new(lnd: LndClient) -> Self {
         Self { lnd, pjs: Default::default() }
+    }
+
+    pub async fn from_config(config: &crate::config::Config) -> Result<Self, SchedulerError> {
+        Ok(Scheduler::new(LndClient::from_config(&config).await?))
     }
 
     /// Schedules a payjoin.
