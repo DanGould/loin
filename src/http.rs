@@ -13,9 +13,12 @@ const STATIC_DIR: &str = "static";
 
 /// Serve requests to Schedule and execute PayJoins with given options.
 pub async fn serve(sched: Scheduler, bind_addr: SocketAddr) -> Result<(), hyper::Error> {
+    println!("starting server on: http://{}", bind_addr);
     let new_service = make_service_fn(move |_| {
         let sched = sched.clone();
         async move {
+            println!("req on: http://");
+
             let handler = move |req| handle_web_req(sched.clone(), req);
             Ok::<_, hyper::Error>(service_fn(handler))
         }
@@ -48,8 +51,10 @@ async fn handle_web_req(
         }
 
         (&Method::POST, "/pj") => {
-            dbg!(req.uri().query());
+            println!("post on: http://");
 
+            dbg!(req.uri().query());
+            println!("{:?}", req.uri().query());
             let headers = Headers(req.headers().to_owned());
             let query = {
                 let uri = req.uri();

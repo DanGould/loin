@@ -34,8 +34,4 @@ bitcoincore-rpc = "0.15.0"
 tempfile = "3"
 tonic = "0.6.2"
 hyper = { version = "0.14.9", features = ["full"] }
-
-# [test]
-# name = "test"
-# path = "tests/integration.rs"
-# required-features = ["test_paths"]
+hyper-tls = { version = "0.5.0" }
