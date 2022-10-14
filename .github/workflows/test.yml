@@ -17,7 +17,7 @@ jobs:
     steps:
     - uses: KengoTODA/actions-setup-docker-compose@main
       with:
-        version: '1.29.2'
+        version: '2.10.2'
     - uses: actions/checkout@v3
     - name: Build
       run: cargo build --verbose
