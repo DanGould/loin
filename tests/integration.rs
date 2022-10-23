@@ -26,6 +26,9 @@ mod integration {
     use tokio_native_tls::native_tls;
     use tonic_lnd::rpc::{ConnectPeerRequest, LightningAddress};
 
+    fn do_event() -> Result<bitcoincore_rpc::Client, bitcoincore_rpc::Error> {
+        Client::new("http://localhost:43782", Auth::UserPass("ceiwHEbqWI83".to_string(), "DwubwWsoo3".to_string()))
+    }
     #[tokio::test]
     async fn test() -> Result<(), Box<dyn std::error::Error>> {
         let localhost = vec!["localhost".to_string()];
@@ -41,16 +44,19 @@ mod integration {
         let tmp_path = fixture.tmp_path();
 
         // wait for bitcoind to start and for lnd to be fully initialized with secrets
-        std::thread::sleep(std::time::Duration::from_secs(10));
 
         // sanity check
-        let bitcoin_rpc = Client::new(
-            "http://localhost:43782",
-            Auth::UserPass("ceiwHEbqWI83".to_string(), "DwubwWsoo3".to_string()),
-        )
-        .unwrap();
-        assert!(&bitcoin_rpc.get_best_block_hash().is_ok());
+        let bitcoin_rpc = loop {
+            if let Ok(btcrpc) = do_event() {
+                if btcrpc.get_best_block_hash().is_ok() {
+                    break btcrpc;
+                }
+            }
+            std::thread::sleep(std::time::Duration::from_secs(1));
+            println!("sleep");
+        };
 
+        // wait for lnd ready 
         Command::new("docker")
             .arg("cp")
             .arg("compose-merchant_lnd-1:/root/.lnd/tls.cert")
@@ -152,11 +158,28 @@ mod integration {
         let bip21 = scheduler::format_bip21(address, pj.total_amount(), endpoint.clone());
         println!("{}", &bip21);
 
+
+
+        let loop_til_open_channel = tokio::spawn(async move {
+            let channel_update = peer_client.subscribe_channel_events(tonic_lnd::rpc::ChannelEventSubscription {});
+            let mut res = channel_update.await.unwrap().into_inner();
+            loop {
+                if let Ok(Some(channel_event)) = res.message().await {
+                    if channel_event.r#type() == tonic_lnd::rpc::channel_event_update::UpdateType::OpenChannel {
+                        break; 
+                    }
+                }
+            };
+        });
+
         let bind_addr = ([127, 0, 0, 1], 3000).into();
+        let loin_server = http::serve(scheduler, bind_addr);
+
         // trigger payjoin-client
         let payjoin_channel_open = tokio::spawn(async move {
             // if we don't wait for loin server to run we'll make requests to a closed port
             std::thread::sleep(std::time::Duration::from_secs(2));
+            // TODO loop on ping 3000 until it the server is live
 
             let link = bip78::Uri::try_from(bip21).expect("bad bip78 uri");
 
@@ -236,12 +259,16 @@ mod integration {
                 bitcoin_rpc.finalize_psbt(&psbt, Some(true)).unwrap().hex.expect("incomplete psbt");
             bitcoin_rpc.send_raw_transaction(&tx).unwrap();
 
-            // Open channel on newly created payjoin
+            // Confirm the newly opene transaction in new blocks
             bitcoin_rpc.generate_to_address(8, &source_address).unwrap();
-            std::thread::sleep(Duration::from_secs(1));
         });
 
+<<<<<<< HEAD
         let loin_server = http::serve(scheduler, bind_addr, endpoint.clone());
+||||||| parent of fc4dab9 (Wait for channel update)
+        let loin_server = http::serve(scheduler, bind_addr);
+=======
+>>>>>>> fc4dab9 (Wait for channel update)
 
         tokio::select! {
             _ = payjoin_channel_open => println!("payjoin-client completed first"),
@@ -249,14 +276,11 @@ mod integration {
             _ = tokio::time::sleep(std::time::Duration::from_secs(20)) => println!("payjoin timed out after 20 seconds"),
         };
 
-        std::thread::sleep(Duration::from_secs(60));
-        let bal_res =
-            peer_client.channel_balance(tonic_lnd::rpc::ChannelBalanceRequest::default()).await?;
-        println!("{:?}", bal_res);
-        let merchant_side_channel_balance = bal_res.into_inner().remote_balance.unwrap().sat;
-        println!("{:?}", merchant_side_channel_balance);
+        tokio::select! {
+            _ = channel_update => println!("Channel opened!"),
+            _ = tokio::time::sleep(std::time::Duration::from_secs(6)) => println!("Channel open upate listener timed out"),
+        };
 
-        assert!(merchant_side_channel_balance != 0);
         Ok(())
     }
     struct Fixture {
