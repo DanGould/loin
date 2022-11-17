@@ -26,7 +26,7 @@ pub async fn request_quote(
     // get address
     // suggest capacity
     let base_uri = format!(
-        "https://nolooking.chaincase.app/api/getquote?nodeid={}&capacity={}&duration={}&refund_address={}",
+        "https://nolooking.chaincase.app/api/request-inbound?nodeid={}&capacity={}&duration={}&refund_address={}",
         p2p_address, 1000000, 1, refund_address
     ); // TODO confirm p2p_address is urlencoded
     let url: Uri = base_uri.parse().map_err(InternalLspError::Uri)?;
